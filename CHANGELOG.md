@@ -5,6 +5,22 @@ All notable changes to `qalainau/filament-warp-shift` will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.1.0] - 2026-11-06
+
+### Added
+
+- Instructions for AI coding assistants (Claude Code, Cursor, Codex) through [Laravel Boost](https://laravel.com/docs/boost):
+  a guideline that Boost adds to `CLAUDE.md` and `AGENTS.md`, and the `warp-shift-development` skill for building
+  rosters and testing them. Select `qalainau/filament-warp-shift` in `php artisan boost:install`, or add it to
+  `"packages"` in `boost.json`. See [AI coding assistants (Laravel Boost)](README.md#ai-coding-assistants-laravel-boost).
+
+- `php artisan warp:assign-tenant "App\Models\Team" 1` (with `--dry-run`, and `custom` for a `tenantKey()` key): for apps that add tenancy later, gives the codes, rosters, staff needed, open shifts, availability and clock-ins saved without a tenant to one tenant, so the tenant panel shows them. Cells, requests and swaps move with their roster. Every row without a tenant moves, in one transaction; if the tenant already has a code key or a roster period that would clash, nothing changes and the command fails.
+- README: **Adding tenancy to an app that already has rosters** and **Testing with tenancy** (opening a tenant in a test, and what another team's IDs do: they are treated as not found, not as an error).
+- `MinLeaveDays::yearFrom(fn (Employee $staff, CarbonImmutable $periodStart) => ...)`: a leave year per person, for leave that has to be taken within a year of the day it was granted. Return the first day of the year this period falls in, or `null` to leave the person out. A year runs for one year from that day (29 February to 28 February). A year that starts during the period counts leave from that day; a year that ends during the period is checked on its last day for the full number of days, and leave after it does not count. Replaces `year()` when both are given. `takenBefore()` and the leave counted from the roster use each person's own start. Marks the row in the roster as before, and in `RosterEvaluation`. README: **A leave year per person**.
+- `navigationGroup()` takes a closure (`fn () => __('Shifts & attendance')`), called each time the navigation is built, so the group is translated in the signed-in user's language. A translated string passed while the panel is configured was fixed in the app's default language.
+
 ## [1.0.0] - 2026-11-04
 
 ### Added

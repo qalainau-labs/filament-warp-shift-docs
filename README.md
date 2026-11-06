@@ -133,6 +133,43 @@ return $panel
 
 > Run `php artisan filament:assets` again after every update of the package.
 
+### Navigation group
+
+The plugin's pages (Shift codes, My shifts, Requests & swaps) go in a navigation group called "Shifts" (translated). Put them in your own group with `navigationGroup()`:
+
+```php
+FilamentWarpShiftPlugin::make()
+    ->navigationGroup(fn () => __('Shifts & attendance'))
+```
+
+Pass a **closure** when the label is translated. The panel is configured before the app knows the signed-in user's language (before your middleware calls `App::setLocale()`), so `->navigationGroup(__('Shifts & attendance'))` would be translated once, in the app's default language, and the plugin's pages would end up in a different group from your own resources for users who read another language. The closure is called each time the navigation is built, in the user's language. A plain string still works when you use one language. `null` (or a closure that returns `null`) keeps the default "Shifts".
+
+### AI coding assistants (Laravel Boost)
+
+Warp Shift ships instructions for AI coding assistants such as Claude Code, Cursor and Codex. If your app uses
+[Laravel Boost](https://laravel.com/docs/boost), the assistant learns how to use Warp Shift from them: which classes
+to extend, which rules are built in, what is easy to get wrong, and how to test a roster.
+
+- **Guidelines** (`resources/boost/guidelines/core.md`): a short summary that Boost adds to `CLAUDE.md`,
+  `AGENTS.md` and the other agent files. It also points the assistant to this README in `vendor/`, so it reads the
+  documentation of the version you have installed instead of guessing.
+- **Skill** `warp-shift-development` (`resources/boost/skills/`): the steps for adding a roster, choosing the rules,
+  and writing feature and browser tests. The assistant loads it when it works on a roster.
+
+Boost does not add guidelines of other vendors' packages on its own. When `php artisan boost:install` asks
+"Which third-party AI guidelines/skills would you like to install?", select `qalainau/filament-warp-shift`. To do
+it without the question, add the package to `boost.json` and run the command again:
+
+```json
+{
+    "packages": ["qalainau/filament-warp-shift"]
+}
+```
+
+```bash
+php artisan boost:install --guidelines --skills -n
+```
+
 ## The roster page
 
 A roster page is a class that extends `ShiftRoster` and returns its settings from the static `roster()` method. Put it in `app/Filament/Pages` (or add it with `->pages()`), like any Filament page. You can have several roster pages, for example one for nurses and one for doctors; each keeps its own rosters.
@@ -794,7 +831,47 @@ use Qalainau\FilamentWarpShift\Rules\MinLeaveDays;
 
 By the end of each period, a person should have taken `days × (days of the year so far ÷ days of the year)`, rounded down: 5 days a year from April means 3 by the end of November and all 5 by the end of March. Leave in this period counts as soon as the row is complete. Days before the period come from `takenBefore()`, or, without it, from the leave cells of this roster page (every ward or shop) since the start of the year. The warning marks the person's row ("2 days of leave so far this year (should be 3 by now, 5 a year)"). Make it an error with `->warn(false)`.
 
-Japan's Labour Standards Act is an example: people granted 10 or more days of annual paid leave must take at least 5 of them within the year (年 5 日の年次有給休暇の確実な取得). That is `MinLeaveDays::make(5)->year($grantMonth)->only(fn ($staff) => $staff->granted_days >= 10)`.
+#### A leave year per person
+
+When the leave year starts on a different day for each person (for example, the day their leave was granted, which depends on when they joined), give each person their own start with `yearFrom()`:
+
+```php
+use Carbon\CarbonImmutable;
+use Qalainau\FilamentWarpShift\Rules\MinLeaveDays;
+
+->rules([
+    MinLeaveDays::make(5)
+        ->yearFrom(fn (Employee $staff, CarbonImmutable $periodStart): ?CarbonImmutable => $staff->leaveYearStart($periodStart)),
+])
+```
+
+The closure gets the person and the first day of the roster's period, and returns the first day of the leave year that this period falls in (a `DateTimeInterface` or a `'Y-m-d'` string), or `null` when the rule does not apply to that person. The year runs for one year from that day: from 1 April to 31 March, from 15 November to 14 November. A year that starts on 29 February ends on 28 February of the next year; one that starts on 31 January ends on 30 January.
+
+- `yearFrom()` replaces `year()`: with both, `year()` is not used. People for whom the closure returns `null` get no warning, as if they were left out with `only()`. `only()` still works on top of it.
+- A year that **starts during the period** (someone granted leave on the 15th of a monthly roster) only counts leave from that day, and expects the share of the year that has passed by the end of the period.
+- A year that **ends during the period** is checked on its last day: leave after it does not count, and the full number of days is expected. That is the last chance to see that someone did not take enough.
+- A year that starts after the period or ended before it is not checked.
+- Days before the period come from `takenBefore()`, which now gets each person's own year start as `$from`; without it, from the leave cells of this roster page since that day.
+
+**Example: a minimum after each grant of leave.** In some countries (Japan is one), people who were granted 10 or more days of paid leave must take at least 5 of them within one year of the grant. With the grants in your own table:
+
+```php
+MinLeaveDays::make(5)
+    ->codes(['PL'])
+    ->yearFrom(function (Employee $staff, CarbonImmutable $periodStart): ?CarbonImmutable {
+        // The grant whose year is running at the start of the period; for someone new, a grant later in the period
+        $grantedOn = $staff->paidLeaveGrants()
+            ->where('days', '>=', 10)
+            ->where('granted_on', '>', $periodStart->subYear())
+            ->orderBy('granted_on')
+            ->value('granted_on');
+
+        return $grantedOn === null ? null : CarbonImmutable::parse($grantedOn);
+    })
+    ->takenBefore(fn (Employee $staff, CarbonImmutable $from, CarbonImmutable $to) => $staff->paidLeaveTaken($from, $to)),
+```
+
+Someone granted 10 days on 1 October 2026 should have taken 2 days by the end of March 2027 (`5 × 182 ÷ 365`, rounded down) and 5 by 30 September 2027. In the October 2027 roster, the closure returns the next grant (1 October 2027) and the count starts again. Someone who has not been granted 10 days yet gets `null` and no warning.
 
 ## Availability
 
@@ -1356,6 +1433,70 @@ Rows are then saved with your key in `tenant_id`. `tenant_type` is the panel's t
 - **Plugin settings are per panel.** `canManage()`, `staffForUser()`, `managers()` and `tenantKey()` apply to the panel whose plugin you set them on. Outside a panel (queued jobs, commands), the settings of the panel registered last are used.
 - **Your closures should know the tenant too.** `managers()` should return the current tenant's managers, or other teams' managers get swap notifications. `scopes()` should return only the current tenant's wards, for example `Ward::query()->whereBelongsTo(Filament::getTenant())`.
 - **Changing the key later.** Rows keep the `tenant_type` and `tenant_id` they were saved with. If you add `tenantKey()` to a running app, update the existing rows to the new keys.
+
+### Adding tenancy to an app that already has rosters
+
+Codes, rosters and staff needed saved before you added `->tenant()` (or `tenantKey()`) have no tenant, so a tenant panel does not show them. Give them to one tenant with:
+
+```bash
+php artisan warp:assign-tenant "App\Models\Team" 1 --dry-run   # count the rows per table, change nothing
+php artisan warp:assign-tenant "App\Models\Team" 1
+php artisan warp:assign-tenant custom clinic-a                  # a key from tenantKey() in a panel without Filament tenancy
+```
+
+The first argument is the tenant model (or its morph alias, or `custom`), the second its key. The command moves **every** row without a tenant in the seven tables listed under [Columns](#columns) (and in the tables of the other Warp plugins you have installed) to that tenant; rows that already have a tenant are not touched. Cells, requests, swaps, submissions and published versions have no tenant of their own and stay with their roster, so a roster moves whole.
+
+- **All or nothing.** A code key and a roster period are unique per tenant. If the tenant already has a code with the same key (its own `N`) or a roster for the same page, place and month, the command stops with an error and changes nothing, in any table. Rename or delete one of the two first, then run it again.
+- **Your staff are yours to move.** The command only changes Warp's tables. Put the people in the team yourself (`team_user` or `team_id`), or the roster shows no staff.
+- **Afterwards, a panel without tenancy no longer shows these rows**, since they now belong to the tenant.
+
+### Testing with tenancy
+
+In a test, open the panel and the tenant the way a request would. Then the models, the pages and the PHP API only see that tenant:
+
+```php
+use Filament\Facades\Filament;
+use Qalainau\FilamentWarpShift\Models\ShiftCode;
+use Qalainau\FilamentWarpShift\PublishedShifts;
+use Qalainau\FilamentWarpShift\Resources\ShiftCodes\Pages\ManageShiftCodes;
+use Qalainau\FilamentWarpShift\WarpShift;
+
+use function Pest\Livewire\livewire;
+
+function inTeam(Team $team): void
+{
+    Filament::setCurrentPanel('app');
+    Filament::setTenant($team, isQuiet: true);
+}
+
+it('keeps the codes of each team apart', function () {
+    $north = Team::factory()->create();
+    $south = Team::factory()->create();
+    $this->actingAs(User::factory()->hasAttached([$north, $south])->create());
+
+    $southNight = WarpShift::get()->asTenant($south, fn () => ShiftCode::query()->create(['key' => 'N', 'label' => 'N', 'name' => 'Night', 'kind' => 'work']));
+
+    inTeam($north);
+
+    expect(ShiftCode::query()->find($southNight->id))->toBeNull();      // not an exception
+    livewire(ManageShiftCodes::class)->assertCanNotSeeTableRecords([$southNight]);
+
+    // Outside a panel, say which tenant
+    expect(PublishedShifts::query()->tenant($south)->get('2026-11-01', '2026-11-30'))->toBeEmpty();
+});
+```
+
+Another team's IDs are **not an error** in Warp Shift: they are treated as not found. So check that nothing changed, not for an exception:
+
+| What | Result |
+| --- | --- |
+| `ShiftCode`, `Plan`, `Requirement`, `Swap`, `ShiftRequest`, `OpenShift`… queried inside a tenant | `find()` returns `null`; lists leave them out. |
+| Cells for people of another team, sent when saving the roster | Refused: counted as `rejected` in the result, the rest is saved. |
+| Approving or declining another team's swap, request or raised hand (Requests & swaps, My shifts) | Nothing changes; at most a “This can’t be changed any more.” notification. |
+| Another team's code in the **Shift codes** table actions | Not found. In a Livewire test, `callTableAction('delete', $id)` throws Filament's `ActionNotResolvableException` (the test helper does, not your app). |
+| A team the user does not belong to, in the URL | 404 from Filament. My shifts in a team where `myShifts()` returns `false`: 403. |
+
+Outside a panel (queued jobs, commands, a test without `inTeam()`), nothing is filtered: every tenant's rows are found. Use `->tenant($team)` or `WarpShift::get()->asTenant($team, fn () => ...)` there, as in [Using rosters from your code](#using-rosters-from-your-code). To check which tenant a row was saved with, read `tenant_type` (the morph class) and `tenant_id` (the key as a string): `expect($plan->tenant_id)->toBe((string) $north->id)`.
 
 ## Keyboard
 
