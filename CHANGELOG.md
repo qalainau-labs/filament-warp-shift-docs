@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-06
+
+### Added
+
+- `JapaneseHolidays::for($year)`: the Japanese holidays of a year as a list of dates.
+
+### Changed
+
+- README: a "Testing" section: a feature test of a rule with `RosterPlan` and `RosterEvaluation`, and what cannot be
+  tested from PHP yet. `RosterEvaluation` returns the breaks of each person only; `RequiredSkill`, staff needed,
+  `AverageNightHours`, `TeamMaxHours` and the budget mark a day or the roster and are not in it. The section shows how
+  to check their setup (`getRosterPayload()`) and their result in a browser test (the list under the bar above the
+  roster).
+
+### Fixed
+
+- The shift inbox named today's date for a rule break of the whole roster (a strict budget, a team-wide rule) that
+  approving a swap would add. It now says "Whole team".
+
 ## [1.1.0] - 2026-11-06
 
 ### Added

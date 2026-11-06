@@ -46,7 +46,7 @@ class WardRoster extends ShiftRoster
 - Setting up: [The roster page](#the-roster-page) · [Staff](#staff) · [Shift codes](#shift-codes) · [Rosters per ward or shop](#rosters-per-ward-or-shop) · [Periods](#periods) · [Holidays](#holidays)
 - Planning: [Typing in the roster](#typing-in-the-roster) · [Times in a cell](#times-in-a-cell) · [Two times in a day](#two-times-in-a-day) · [The day by hour](#the-day-by-hour) · [Notes](#notes) · [Places](#places) · [Staff needed](#staff-needed) ([from your app](#staff-needed-from-your-app)) · [Rules](#rules) ([who works together](#who-works-together)) · [Rotations](#rotations) · [Auto-fill](#auto-fill) · [Why this person?](#why-this-person) · [Fairness over the year](#fairness-over-the-year) · [Help from another ward](#help-from-another-roster) · [Labour cost and budget](#labour-cost-and-budget) · [Importing from Excel](#importing-from-excel) · [Publishing](#publishing) · [Closing a roster](#closing-a-roster)
 - Staff: [My shifts](#my-shifts) · [Requests](#requests) · [Leave balance](#leave-balance) · [Availability](#availability) · [Reminders](#reminders) · [Swaps and cover](#swaps-and-cover) · [Open shifts](#open-shifts) · [Approving swaps and requests](#approving-swaps-and-requests) · [Calendar feed](#calendar-feed) · [Notifications](#notifications)
-- [Clock-ins (actuals)](#clock-ins-actuals) · [Excel, CSV and printing](#excel-csv-and-printing) · [Payroll summary](#payroll-summary) · [Using rosters from your code](#using-rosters-from-your-code) ([rules and projections](#rules-and-projections-from-your-code)) · [Saving and working together](#saving-and-working-together) · [Permissions](#permissions) · [Tenancy](#tenancy) · [Keyboard](#keyboard) · [Limitations](#limitations) · [Troubleshooting](#troubleshooting)
+- [Clock-ins (actuals)](#clock-ins-actuals) · [Excel, CSV and printing](#excel-csv-and-printing) · [Payroll summary](#payroll-summary) · [Using rosters from your code](#using-rosters-from-your-code) ([rules and projections](#rules-and-projections-from-your-code)) · [Saving and working together](#saving-and-working-together) · [Permissions](#permissions) · [Tenancy](#tenancy) · [Testing](#testing) · [Keyboard](#keyboard) · [Limitations](#limitations) · [Troubleshooting](#troubleshooting)
 
 ## Why
 
@@ -1497,6 +1497,69 @@ Another team's IDs are **not an error** in Warp Shift: they are treated as not f
 | A team the user does not belong to, in the URL | 404 from Filament. My shifts in a team where `myShifts()` returns `false`: 403. |
 
 Outside a panel (queued jobs, commands, a test without `inTeam()`), nothing is filtered: every tenant's rows are found. Use `->tenant($team)` or `WarpShift::get()->asTenant($team, fn () => ...)` there, as in [Using rosters from your code](#using-rosters-from-your-code). To check which tenant a row was saved with, read `tenant_type` (the morph class) and `tenant_id` (the key as a string): `expect($plan->tenant_id)->toBe((string) $north->id)`.
+
+## Testing
+
+The roster page checks the rules in the browser while you type, and the PHP side checks them again for auto-fill, swaps, open shifts and `RosterEvaluation`. In a feature test, build the roster with [`RosterPlan`](#making-and-publishing-rosters) (the same cells the page saves) and read the rule breaks with [`RosterEvaluation`](#rules-and-projections-from-your-code). The shift codes must exist in the test database.
+
+```php
+use Qalainau\FilamentWarpShift\RosterEvaluation;
+use Qalainau\FilamentWarpShift\RosterPlan;
+
+it('marks a sixth day in a row', function () {
+    // The roster has MaxConsecutiveDays::make(5)
+    $nurse = Nurse::factory()->create(['ward' => 'east']);
+
+    RosterPlan::for(WardRoster::class, '2026-11-01')->scope('east')->replace([
+        (string) $nurse->id => ['2026-11-02' => 'E', '2026-11-03' => 'E', '2026-11-04' => 'E', '2026-11-05' => 'E', '2026-11-06' => 'E', '2026-11-07' => 'E'],
+    ]);
+
+    $evaluation = RosterEvaluation::for(WardRoster::class, '2026-11-01')->scope('east')->draft()->get()->get((string) $nurse->id);
+
+    expect($evaluation->errors())->toHaveCount(1)
+        ->and($evaluation->errors()[0])->toMatchArray(['type' => 'max_consecutive', 'severity' => 'error', 'date' => '2026-11-07'])
+        ->and($evaluation->level())->toBe('error');
+});
+```
+
+- `->draft()` checks what the roster page shows. Without it, the published version is checked.
+- `scope()` is only needed for rosters with [several wards or shops](#rosters-per-ward-or-shop).
+- `RosterEvaluation` works for every rule that marks a person: days in a row, shift sequences, rest hours, hours, counts, days off, overtime, availability, who works together, leave and requests.
+
+### What you cannot test from PHP yet
+
+Some breaks belong to a day or to the whole roster, not to a person. `RosterEvaluation` returns breaks per person, so these are **not in it**, and no other public PHP method returns them today:
+
+| Not in `RosterEvaluation` | Marks |
+| --- | --- |
+| `RequiredSkill` (a senior on every night) | the date |
+| Staff needed: too few or too many people on a shift, at a time of day or at a place | the "staff needed" rows |
+| `AverageNightHours`, `TeamMaxHours` ([whole-team rules](#whole-team-rules)) | the whole roster |
+| The [budget](#labour-cost-and-budget) | the whole roster |
+
+A test that looks for `required_skill`, `team_max_hours` or `budget` in `$evaluation->violations` finds nothing, even when the roster breaks them. What you can do instead:
+
+- **Check that the rule is set up.** The roster page passes its rules and each person's skills to the browser. `getRosterPayload()` returns them:
+
+  ```php
+  use function Pest\Livewire\livewire;
+
+  $payload = livewire(WardRoster::class)->instance()->getRosterPayload();
+
+  expect(collect($payload['rules'])->firstWhere('type', 'required_skill'))
+      ->toMatchArray(['skill' => 'leader', 'codes' => ['N'], 'min' => 1, 'severity' => 'error'])
+      ->and(collect($payload['staffList'])->firstWhere('name', 'Ann')['skills'])->toBe(['leader']);
+  ```
+
+  This proves the rule and your `skills()` closure reach the roster, not that a given roster breaks it. The payload is the data the page sends to its JavaScript, so its keys can change in a release.
+- **Check the result in a browser test.** The bar above the roster counts the rule breaks of people, of days and of the whole team, budget included ("1 rule break · 2 warnings", or "No rule breaks"). Click it to list them. Each line is a button with the date (`11/02`, empty for the whole roster), who (a name, empty for a day, "Whole team" for the roster) and the message, for example "Whole team" and "80.4 h of night work on average for 18 people (max 72 h)". Staff needed is not in this list: it is shown in the "staff needed" rows, which are drawn on the canvas. With Playwright:
+
+  ```js
+  await page.getByRole('button', { name: /rule break|warning|No rule breaks/ }).click()
+  await expect(page.getByRole('button', { name: /Whole team.*night work on average/ })).toBeVisible()
+  ```
+
+  The texts follow the panel's language. The roster itself is a canvas, so read the bar and the list, not the cells.
 
 ## Keyboard
 
