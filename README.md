@@ -46,7 +46,7 @@ class WardRoster extends ShiftRoster
 - Setting up: [The roster page](#the-roster-page) · [Staff](#staff) · [Shift codes](#shift-codes) · [Rosters per ward or shop](#rosters-per-ward-or-shop) · [Periods](#periods) · [Holidays](#holidays)
 - Planning: [Typing in the roster](#typing-in-the-roster) · [Times in a cell](#times-in-a-cell) · [Two times in a day](#two-times-in-a-day) · [The day by hour](#the-day-by-hour) · [Notes](#notes) · [Places](#places) · [Staff needed](#staff-needed) ([from your app](#staff-needed-from-your-app)) · [Rules](#rules) ([who works together](#who-works-together)) · [Rotations](#rotations) · [Auto-fill](#auto-fill) · [Why this person?](#why-this-person) · [Fairness over the year](#fairness-over-the-year) · [Help from another ward](#help-from-another-roster) · [Labour cost and budget](#labour-cost-and-budget) · [Importing from Excel](#importing-from-excel) · [Publishing](#publishing) · [Closing a roster](#closing-a-roster)
 - Staff: [My shifts](#my-shifts) · [Requests](#requests) · [Leave balance](#leave-balance) · [Availability](#availability) · [Reminders](#reminders) · [Swaps and cover](#swaps-and-cover) · [Open shifts](#open-shifts) · [Approving swaps and requests](#approving-swaps-and-requests) · [Calendar feed](#calendar-feed) · [Notifications](#notifications)
-- [Clock-ins (actuals)](#clock-ins-actuals) · [Excel, CSV and printing](#excel-csv-and-printing) · [Payroll summary](#payroll-summary) · [Using rosters from your code](#using-rosters-from-your-code) ([rules and projections](#rules-and-projections-from-your-code)) · [Saving and working together](#saving-and-working-together) · [Permissions](#permissions) · [Tenancy](#tenancy) · [Testing](#testing) · [Keyboard](#keyboard) · [Limitations](#limitations) · [Troubleshooting](#troubleshooting)
+- [Clock-ins (actuals)](#clock-ins-actuals) · [Excel, CSV and printing](#excel-csv-and-printing) · [Payroll summary](#payroll-summary) · [Using rosters from your code](#using-rosters-from-your-code) ([rules and projections](#rules-and-projections-from-your-code)) · [Saving and working together](#saving-and-working-together) · [Permissions](#permissions) · [Tenancy](#tenancy) · [Testing](#testing) ([browser tests](#browser-tests-javascript)) · [Keyboard](#keyboard) · [Limitations](#limitations) · [Troubleshooting](#troubleshooting)
 
 ## Why
 
@@ -75,7 +75,8 @@ class WardRoster extends ShiftRoster
 - Rotations ("4 on, 2 off", "Day → Night → After night → Off") poured into the rows you pick, per person from your data, carried on into the next period, and put in first by auto-fill
 - Leave balance from your app: leave past the balance is marked, refused in requests and kept by auto-fill; a warning for people who take too little leave over the year
 - Japanese public holidays built in
-- PHP API to read published shifts (for clock-in or payroll), a payroll summary per person, rule breaks and projected hours and overtime per person (`RosterEvaluation`), and to make and publish rosters (for seeders and imports)
+- PHP API to read published shifts (for clock-in or payroll), a payroll summary per person, rule breaks and projected hours and overtime per person, and the rule breaks of each day and of the whole team (`RosterEvaluation`), and to make and publish rosters (for seeders and imports)
+- **Browser tests**: a small JavaScript API for Playwright: where a cell is on the canvas, what each cell shows, and when the roster has finished saving
 - Clock-ins next to the plan: passed from your attendance table (or imported from a time clock's CSV), with late, early, overtime, no clock-in, missing clock-out and work without a shift marked in the roster, today's late and missing people above it, clock-in bars in the day view, and payroll from the hours worked
 - Auto-fill (only empty cells, or everything except pinned cells), fairness for nights and weekends counted over the whole year, top-up shift, a report of what is short, and three drafts to compare (balanced, requests first, fairness first, lowest cost)
 - "Why this person?" for any shift: the reasons, and why each colleague is not on it
@@ -1233,6 +1234,11 @@ foreach ($evaluations as $evaluation) {
 }
 
 RosterEvaluation::for(ShiftSchedule::class, '2026-11-01', '2026-12-31')->tenant($company)->forStaff($employee);
+
+// Breaks that belong to a day or to the whole roster, not to a person
+$evaluation = RosterEvaluation::for(ShiftSchedule::class, '2026-11-01')->tenant($company);
+$evaluation->forDay('2026-11-02');     // [['type' => 'required_skill', 'severity' => 'error', 'date' => '2026-11-02', 'message' => '0 “leader” on Night (needs 1)', 'params' => [...], 'scope' => 'east'], ...]
+$evaluation->forTeam();                // [['type' => 'budget', 'severity' => 'warning', 'date' => null, 'message' => 'Labour cost 580 is over the budget of 100', 'params' => [...], 'scope' => 'east'], ...]
 ```
 
 | Method | |
@@ -1243,10 +1249,15 @@ RosterEvaluation::for(ShiftSchedule::class, '2026-11-01', '2026-12-31')->tenant(
 | `draft()` | Use the draft instead of the published version (what the roster page shows). |
 | `actuals(false)` | Use the plan only, even when the roster has clock-ins. |
 | `at($dateTime)` | "Now" — where clock-ins stop and the plan starts, and what counts as late today. Default `now()`. Pass a moment with its time, not `today()`: at midnight no shift has started yet, so nobody is marked as not clocked in today. |
+| `get()` | Per person: a Collection of `StaffEvaluation`, keyed by staff key. `forStaff($model)` returns one (or null). |
+| `forDay($date)` | The breaks of one day: `RequiredSkill` (too few people with a skill on a shift). Empty for a day outside `$from`–`$to`. Staff needed (too few or too many people) is not a rule break and is not in it. |
+| `forTeam()` | The breaks of the whole roster: [whole-team rules](#whole-team-rules) (`AverageNightHours`, `TeamMaxHours`) and the [budget](#labour-cost-and-budget). These show as "Whole team" on the roster page. |
+
+`forDay()` and `forTeam()` return the same keys as `$evaluation->violations`, plus `scope` (the ward or shop, `''` without scopes). With several wards each ward has its own lines; over several periods, each period has its own `forTeam()` lines, in order. They are counted like the people's breaks: with clock-ins, settled days use what was clocked.
 
 How it counts:
 
-- **Projection.** A settled day (before today, or today after the clock-out) uses its clock-ins: a shift that was worked keeps its code and place with the clocked times, work on a day off counts as work, and a scheduled day without a clock-in counts as 0 hours. A day with a missing clock-out keeps the planned hours. Today before the clock-out and later days use the roster. Minutes your app counted (`worked`, `overtime`, `holiday`, `night`) replace the plugin's count on settled days.
+- **Projection.** A settled day (before today, or today after the clock-out) uses its clock-ins: a shift that was worked keeps its code and place with the clocked times, work on a day off counts as work, and a scheduled day without a clock-in counts as 0 hours. Rules that only check a filled-in row (too few days off, too few hours, [leave over the year](#leave-over-the-year)) still run: that day counts as filled in, and as a day off for `MinDaysOff`. A day with a missing clock-out keeps the planned hours. Today before the clock-out and later days use the roster. Minutes your app counted (`worked`, `overtime`, `holiday`, `night`) replace the plugin's count on settled days.
 - **Rules per period.** Each period is evaluated like the roster page (monthly limits apply to the period, the weekly 40 hours carry over from the days before it, earlier months come from [`priorOvertime()`](#overtime-japans-36-agreement)). Rule breaks on the days asked for are returned, plus breaks without a date (such as "too few days off") when the period overlaps. Sums only add the days asked for; `periods` has the 36 agreement figures for each period.
 - **Wards and help.** Each person is evaluated on the roster of their own ward or shop, with days helping elsewhere counted as theirs (as on the roster page). A person is listed once, under the first scope that has them.
 - **Staff whose roster was never opened** are still listed (with their clock-ins, if any).
@@ -1524,42 +1535,96 @@ it('marks a sixth day in a row', function () {
 
 - `->draft()` checks what the roster page shows. Without it, the published version is checked.
 - `scope()` is only needed for rosters with [several wards or shops](#rosters-per-ward-or-shop).
-- `RosterEvaluation` works for every rule that marks a person: days in a row, shift sequences, rest hours, hours, counts, days off, overtime, availability, who works together, leave and requests.
+- `get()` has the rules that mark a person: days in a row, shift sequences, rest hours, hours, counts, days off, overtime, availability, who works together, leave and requests.
 
-### What you cannot test from PHP yet
+### Breaks of a day or of the whole roster
 
-Some breaks belong to a day or to the whole roster, not to a person. `RosterEvaluation` returns breaks per person, so these are **not in it**, and no other public PHP method returns them today:
+Some breaks belong to a day or to the whole roster, not to a person, so they are not in `get()`. Read them with `forDay()` and `forTeam()`:
 
-| Not in `RosterEvaluation` | Marks |
-| --- | --- |
-| `RequiredSkill` (a senior on every night) | the date |
-| Staff needed: too few or too many people on a shift, at a time of day or at a place | the "staff needed" rows |
-| `AverageNightHours`, `TeamMaxHours` ([whole-team rules](#whole-team-rules)) | the whole roster |
-| The [budget](#labour-cost-and-budget) | the whole roster |
+| Rule | Read it with | Marks on the roster page |
+| --- | --- | --- |
+| `RequiredSkill` (a leader on every night) | `forDay('2026-11-02')` | the date |
+| `AverageNightHours`, `TeamMaxHours` ([whole-team rules](#whole-team-rules)) | `forTeam()` | "Whole team" |
+| The [budget](#labour-cost-and-budget) | `forTeam()` | "Whole team" |
 
-A test that looks for `required_skill`, `team_max_hours` or `budget` in `$evaluation->violations` finds nothing, even when the roster breaks them. What you can do instead:
+```php
+it('needs a leader on every night', function () {
+    // The roster has RequiredSkill::make('leader')->on(['N'])->atLeast(1)
+    $ben = Nurse::factory()->create(['ward' => 'east', 'skills' => []]);
 
-- **Check that the rule is set up.** The roster page passes its rules and each person's skills to the browser. `getRosterPayload()` returns them:
+    RosterPlan::for(WardRoster::class, '2026-11-01')->scope('east')->replace([
+        (string) $ben->id => ['2026-11-02' => 'N'],
+    ]);
 
-  ```php
-  use function Pest\Livewire\livewire;
+    $evaluation = RosterEvaluation::for(WardRoster::class, '2026-11-01')->scope('east')->draft();
 
-  $payload = livewire(WardRoster::class)->instance()->getRosterPayload();
+    expect($evaluation->forDay('2026-11-02'))->toHaveCount(1)
+        ->and($evaluation->forDay('2026-11-02')[0])->toMatchArray(['type' => 'required_skill', 'severity' => 'error', 'date' => '2026-11-02'])
+        ->and($evaluation->forDay('2026-11-03'))->toBe([]);
+});
 
-  expect(collect($payload['rules'])->firstWhere('type', 'required_skill'))
-      ->toMatchArray(['skill' => 'leader', 'codes' => ['N'], 'min' => 1, 'severity' => 'error'])
-      ->and(collect($payload['staffList'])->firstWhere('name', 'Ann')['skills'])->toBe(['leader']);
-  ```
+it('stays within the budget', function () {
+    // ...a roster that costs too much
+    $evaluation = RosterEvaluation::for(WardRoster::class, '2026-11-01')->scope('east')->draft();
 
-  This proves the rule and your `skills()` closure reach the roster, not that a given roster breaks it. The payload is the data the page sends to its JavaScript, so its keys can change in a release.
-- **Check the result in a browser test.** The bar above the roster counts the rule breaks of people, of days and of the whole team, budget included ("1 rule break · 2 warnings", or "No rule breaks"). Click it to list them. Each line is a button with the date (`11/02`, empty for the whole roster), who (a name, empty for a day, "Whole team" for the roster) and the message, for example "Whole team" and "80.4 h of night work on average for 18 people (max 72 h)". Staff needed is not in this list: it is shown in the "staff needed" rows, which are drawn on the canvas. With Playwright:
+    expect(array_column($evaluation->forTeam(), 'type'))->toContain('budget');
+});
+```
 
-  ```js
-  await page.getByRole('button', { name: /rule break|warning|No rule breaks/ }).click()
-  await expect(page.getByRole('button', { name: /Whole team.*night work on average/ })).toBeVisible()
-  ```
+Each line has `type`, `severity`, `date` (null for the whole roster), `message` (in the app's language), `params` and `scope`.
 
-  The texts follow the panel's language. The roster itself is a canvas, so read the bar and the list, not the cells.
+**Staff needed** (too few or too many people on a shift, at a time of day or at a place) is not a rule break: the roster page shows it in the "staff needed" rows, drawn on the canvas, and neither `RosterEvaluation` nor the list of rule breaks has it. To check that your requirements reach the roster, read the payload the page sends to its JavaScript:
+
+```php
+use function Pest\Livewire\livewire;
+
+$payload = livewire(WardRoster::class)->instance()->getRosterPayload();
+
+expect(collect($payload['rules'])->firstWhere('type', 'required_skill'))
+    ->toMatchArray(['skill' => 'leader', 'codes' => ['N'], 'min' => 1, 'severity' => 'error'])
+    ->and(collect($payload['staffList'])->firstWhere('name', 'Ann')['skills'])->toBe(['leader']);
+```
+
+The payload is internal data, so its keys can change in a release. Prefer `RosterEvaluation` for the rules.
+
+In a browser test, the bar above the roster counts the rule breaks of people, of days and of the whole team, budget included ("1 rule break · 2 warnings", or "No rule breaks"). Click it to list them. Each line is a button with the date (`11/02`, empty for the whole roster), who (a name, empty for a day, "Whole team" for the roster) and the message. With Playwright:
+
+```js
+await page.getByRole('button', { name: /rule break|warning|No rule breaks/ }).click()
+await expect(page.getByRole('button', { name: /Whole team.*night work on average/ })).toBeVisible()
+```
+
+The texts follow the panel's language. The roster itself is a canvas, so read the bar and the list, not the cells.
+
+## Browser tests (JavaScript)
+
+The roster is drawn on a canvas, so there is no element per cell. For Playwright (or any browser test or screen recording), the roster has a small JavaScript API on its Alpine component, `.fi-warp-sft-roster`. It tells you where a cell is, what each cell shows, and when the roster has finished saving:
+
+```js
+const roster = (fn, arg) => page.evaluate(([fn, arg]) =>
+    new Function('roster', 'arg', `return (${fn})(roster, arg)`)(Alpine.$data(document.querySelector('.fi-warp-sft-roster')), arg), [fn.toString(), arg])
+
+await page.goto('/admin/ward-roster')
+await page.waitForFunction(() => document.querySelector('.fi-warp-sft-roster') && window.Alpine)
+await roster((r) => r.whenIdle())
+
+// find Ann's (staff key 12) cell on 2 November and type an early shift
+const cell = await roster((r, arg) => r.cellPoint(arg), { staff: '12', date: '2026-11-02' })
+// { staff: '12', date: '2026-11-02', row: 3, column: 1, x: 297, y: 343, left: 280, top: 328, width: 34, height: 30, visible: true }
+
+await page.mouse.click(cell.x, cell.y)
+await page.keyboard.type('E')
+await roster((r) => r.whenIdle())   // saved and drawn again
+
+const [shift] = await roster((r, arg) => r.shiftsOnScreen(arg), { staff: '12', date: '2026-11-02' })
+expect(shift).toMatchObject({ code: 'E', start: '07:00', end: '15:45', level: null })
+```
+
+- **`cellPoint({ staff, date })`** — returns a promise with the position of a cell. `staff` is the staff key (your model's key, as a string or number) and `date` is `'Y-m-d'`. If the cell is out of view, the roster scrolls it into view first (and the page, if the roster is below the window), so a click at `x`, `y` lands on it. `x` and `y` are the center and `left`, `top`, `width`, `height` the box, in the same viewport pixels as `getBoundingClientRect()`; `row` and `column` are the row and day position in the roster. Pass `scroll: false` to measure without scrolling; `visible` then tells you whether the center can be clicked (not under the frozen names, dates, totals or "staff needed" rows, and inside the window). It returns `null` for a person who is not on this roster and a day outside the period.
+- **`shiftsOnScreen(filter)`** — the cells that have a code, in row and day order, as the roster draws them. Each item has `staff`, `name`, `date`, `code` (the code key), `label` (what the cell shows: `夜`, `10-15`, `10-14,17-21`), `kind` (`work`, `off`, `leave`…), `start` and `end` (the times typed into the cell, or the code's times; `null` for days off), `start2` and `end2` for [two times in a day](#two-times-in-a-day), `place`, `note`, `locked`, `level` (`'error'`, `'warning'` or `null`: the corner mark of a rule break), `row`, `column` and `box` (the same position as `cellPoint()`, with `visible`). Only cells in view are listed; pass `all: true` for every cell of the period (`box.visible` is then `false` for those out of view). Filter with `staff`, `date` and `code`, each one value or a list: `shiftsOnScreen({ code: ['N', 'A'], date: '2026-11-02' })`. Codes you just typed are included before they are saved.
+- **`whenIdle()`** — returns a promise that resolves when nothing is waiting to be saved (including the short pause before a save), no save or other request of the page (auto-fill, publish, switching the period) is running, and the roster has been drawn again. It rejects after 10 seconds, for example while saves keep failing (`whenIdle({ timeout: 30000 })` to wait longer). The error message includes the save status (`saving`, `failed`, `offline`).
+- Switching the period or the ward makes a new roster component, so look `.fi-warp-sft-roster` up again after that, as above. Empty cells are not in `shiftsOnScreen()`; use `cellPoint()` with the staff key and the date to click one.
+- The rule breaks of the whole roster are listed in the bar above it (see [Testing](#testing)); `level` gives the mark of each cell. To check what was saved, read it on the server with [`RosterPlan::for(...)->cells()`](#making-and-publishing-rosters) or reload the page and read `shiftsOnScreen()` again.
 
 ## Keyboard
 

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-06
+
+### Added
+
+- `RosterEvaluation::forDay($date)` and `forTeam()`: the rule breaks of a day (`RequiredSkill`) and of the whole roster (`AverageNightHours`, `TeamMaxHours`, budget), with the same keys as a person's `violations` plus `scope`, so tests and dashboards can check them from PHP.
+- A JavaScript API for browser tests on the roster's Alpine component (`.fi-warp-sft-roster`): `cellPoint({ staff, date })` (where to click a cell, scrolled into view), `shiftsOnScreen(filter)` (the cells with a code as drawn: code, label, times, rule-break mark, position) and `whenIdle()` (waits until saved and drawn). See "Browser tests (JavaScript)" in the README.
+
+### Fixed
+
+- Rule messages say one in the singular: "1 day of leave", "1 day off", "N 1 time", "for 1 person" (was "1 days", "1 times", "1 people"), in every language with plurals (French also for 0). "Together" now reads "Partners on the same N: 0 (needs 1)" instead of "Needs 2 partner …".
+- `RosterEvaluation` with clock-ins: a past scheduled day without a clock-in no longer makes the person's row count as unfinished, so `MinLeaveDays` (also with `yearFrom()`), `MinDaysOff`, `MinHours` and `MinCount` still warn. The day counts as filled in, and as a day off for `MinDaysOff`.
+
 ## [1.2.0] - 2026-11-06
 
 ### Added
