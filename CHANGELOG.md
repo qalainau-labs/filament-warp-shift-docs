@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-07
+
+### Added
+
+- Rule code keys are checked. When a rule, `codes([...])` or `rotations()` names a shift code key that no code has, the rule used to check nothing without a word. Now, each time a roster is read (the page, `RosterEvaluation`, auto-fill), against the current tenant's codes: a key that is another code's label (`AfterShift::make('N')` for the code with the key `night`) throws an `InvalidArgumentException` outside production that names the key, the rules that use it and the right key; a key that matches no code (a typo, or a code this tenant has not created yet) is logged as a warning, once per request. In production both are only logged. `Roster::strictCodes()` makes every unknown key throw (also in production), `strictCodes(false)` only logs. Nothing is checked before any code exists. See "Keys that no code has" in the README.
+
+### Changed
+
+- README, Boost guideline and skill: an example where the code typed in the cells and its key differ (`N` and `night`), and that rules take the key. `staffForUser()` is in the guideline and in the skill's setup steps: when the staff model is not `User`, My shifts otherwise takes the `User` as the staff record and shows an empty calendar.
+
 ## [1.3.0] - 2026-11-06
 
 ### Added

@@ -44,7 +44,7 @@ class WardRoster extends ShiftRoster
 
 - [Why](#why) · [Features](#features) · [Requirements](#requirements) · [Installation](#installation)
 - Setting up: [The roster page](#the-roster-page) · [Staff](#staff) · [Shift codes](#shift-codes) · [Rosters per ward or shop](#rosters-per-ward-or-shop) · [Periods](#periods) · [Holidays](#holidays)
-- Planning: [Typing in the roster](#typing-in-the-roster) · [Times in a cell](#times-in-a-cell) · [Two times in a day](#two-times-in-a-day) · [The day by hour](#the-day-by-hour) · [Notes](#notes) · [Places](#places) · [Staff needed](#staff-needed) ([from your app](#staff-needed-from-your-app)) · [Rules](#rules) ([who works together](#who-works-together)) · [Rotations](#rotations) · [Auto-fill](#auto-fill) · [Why this person?](#why-this-person) · [Fairness over the year](#fairness-over-the-year) · [Help from another ward](#help-from-another-roster) · [Labour cost and budget](#labour-cost-and-budget) · [Importing from Excel](#importing-from-excel) · [Publishing](#publishing) · [Closing a roster](#closing-a-roster)
+- Planning: [Typing in the roster](#typing-in-the-roster) · [Times in a cell](#times-in-a-cell) · [Two times in a day](#two-times-in-a-day) · [The day by hour](#the-day-by-hour) · [Notes](#notes) · [Places](#places) · [Staff needed](#staff-needed) ([from your app](#staff-needed-from-your-app)) · [Rules](#rules) ([keys that no code has](#keys-that-no-code-has), [who works together](#who-works-together)) · [Rotations](#rotations) · [Auto-fill](#auto-fill) · [Why this person?](#why-this-person) · [Fairness over the year](#fairness-over-the-year) · [Help from another ward](#help-from-another-roster) · [Labour cost and budget](#labour-cost-and-budget) · [Importing from Excel](#importing-from-excel) · [Publishing](#publishing) · [Closing a roster](#closing-a-roster)
 - Staff: [My shifts](#my-shifts) · [Requests](#requests) · [Leave balance](#leave-balance) · [Availability](#availability) · [Reminders](#reminders) · [Swaps and cover](#swaps-and-cover) · [Open shifts](#open-shifts) · [Approving swaps and requests](#approving-swaps-and-requests) · [Calendar feed](#calendar-feed) · [Notifications](#notifications)
 - [Clock-ins (actuals)](#clock-ins-actuals) · [Excel, CSV and printing](#excel-csv-and-printing) · [Payroll summary](#payroll-summary) · [Using rosters from your code](#using-rosters-from-your-code) ([rules and projections](#rules-and-projections-from-your-code)) · [Saving and working together](#saving-and-working-together) · [Permissions](#permissions) · [Tenancy](#tenancy) · [Testing](#testing) ([browser tests](#browser-tests-javascript)) · [Keyboard](#keyboard) · [Limitations](#limitations) · [Troubleshooting](#troubleshooting)
 
@@ -218,6 +218,21 @@ Shift codes are managed under **Shifts → Shift codes** (the resource is added 
 | Starts / Ends / Break | Working time. An end earlier than the start means the next day (night shifts). Hours are end − start − break. Codes without times count as 0 hours. |
 | Order | The order in the code list, the legend and the staff needed rows. You can also drag the rows. |
 | In use | Turned off codes can no longer be typed, but stay in old rosters. |
+
+The code and the key can differ. Rules, `codes([...])`, requirements, rotations and `RosterPlan` always take the **key**: a night shift typed as `N` whose key is `night` (for example a key that comes from your payroll system) is written like this:
+
+```php
+ShiftCode::query()->create(['key' => 'night', 'label' => 'N', 'name' => 'Night', 'kind' => CodeKind::Work, 'starts_at' => '23:00', 'ends_at' => '07:30', 'break_minutes' => 30]);
+ShiftCode::query()->create(['key' => 'after_night', 'label' => 'A', 'name' => 'After night', 'kind' => CodeKind::Rest]);
+ShiftCode::query()->create(['key' => 'off', 'label' => 'O', 'name' => 'Day off', 'kind' => CodeKind::Off]);
+
+->rules([
+    AfterShift::make('night')->then(['after_night', 'off']),   // not AfterShift::make('N')
+    RequiredSkill::make('senior')->on(['night'])->atLeast(1),
+])
+```
+
+A rule, `codes()` or a rotation that names a key no code has is [checked when the roster is read](#keys-that-no-code-has). The other examples in this README use codes whose key and code are the same (`N`).
 
 A code can also carry your own data in its `meta` column (a JSON object, not shown in the form), for example the site or the contract a shift is for. Warp Shift does not use it; [reading published shifts](#reading-published-shifts) returns it with every shift:
 
@@ -503,6 +518,24 @@ Every rule:
 
 Requests are checked too: a cell that breaks a day-off or "not this shift" request gets a warning.
 
+### Keys that no code has
+
+Rules name shift codes by their **key** (see [Shift codes](#shift-codes)). A key that no code has would make the rule check nothing, so Warp Shift checks the keys of the rules, `codes([...])` and `rotations()` each time a roster is read (the roster page, `RosterEvaluation`, auto-fill), against the codes of the current tenant, turned off codes included:
+
+| The key | Outside production | In production |
+| --- | --- | --- |
+| is the **code** (label) of another code: `AfterShift::make('N')` where `N` is typed for the code with the key `night` | an `InvalidArgumentException` that names the key, the rules that use it and the key it should be (`'N' is the label of 'night'`) | a warning in the log |
+| matches no code at all (a typo, or a code this tenant has not created yet) | a warning in the log | a warning in the log |
+
+Nothing is checked while there are no shift codes yet. The warning is written once per request. To decide yourself:
+
+```php
+->strictCodes()        // every unknown key throws, in production too (your app creates all the codes)
+->strictCodes(false)   // only log, also for labels
+```
+
+In an app where each tenant creates its own codes on the Shift codes screen, keep the default: a tenant who has not added, say, a paid-leave code still gets their roster, and the log tells you which rule is idle.
+
 ### Who works together
 
 Two rules look at the people on the same shift on the same day (the same code; with `->samePlace()`, the same [place](#places) too).
@@ -773,7 +806,7 @@ FilamentWarpShiftPlugin::make()
     ->staffForUser(fn (User $user) => $user->nurse)   // default: the user is the staff (staff model is User)
 ```
 
-Users without a staff record do not see the page. Hide it with `->myShifts(false)`, or decide per tenant and per person:
+When the staff model is not `User`, `staffForUser()` is required: without it the `User` is taken as the staff record, so My shifts opens with an empty calendar (no error) and staff never see their published shifts. Users without a staff record (the closure returns `null`) do not see the page. Hide it with `->myShifts(false)`, or decide per tenant and per person:
 
 ```php
 FilamentWarpShiftPlugin::make()
@@ -1670,9 +1703,9 @@ On phones, swipe to scroll and tap to select. The names column is narrower and t
 
 **"Add shift codes first."** Create your codes under Shifts → Shift codes. The roster needs at least one.
 
-**A staff member does not see My shifts.** `staffForUser()` must return their staff record, and they must be on a roster that has been published.
+**A staff member does not see My shifts, or sees an empty calendar.** `staffForUser()` must return their staff record, and they must be on a roster that has been published. When the staff model is not `User` (a `Nurse`, an `Employee`), set `->staffForUser(fn (User $user) => $user->nurse)`: without it the signed-in `User` itself is taken as the staff record, My shifts opens and stays empty.
 
-**A rule does nothing.** Rule codes are the code **keys**, not the labels. A closure that returns `null` for a person skips them.
+**A rule does nothing.** Rule codes are the code **keys**, not the labels; look for "uses shift code keys that do not exist" in the log (see [Keys that no code has](#keys-that-no-code-has)). A closure that returns `null` for a person skips them.
 
 **Two people saved the same cell and one lost their change.** That is the conflict handling: the first one wins and the second sees a message. On SQLite, give the connection a `busy_timeout` (for example `5000`) in `config/database.php` so that simultaneous saves wait instead of failing.
 
