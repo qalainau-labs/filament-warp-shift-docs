@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-10
+
+### Added
+
+- `useWarpDatePicker()`: the holidays of the roster come from a Warp DatePicker calendar (the panel's or one place's), optionally with company days off. Warp DatePicker is not released yet; nothing changes until you call it.
+- A **Marks** legend under the roster explains every mark: rule breaks (red and amber), the dot by a date, a name or "Staff", requests (approved, waiting and "not this shift" side by side), notes, pins, unsaved and changed-since-published cells (and today's clock-in, places, unavailable days and app-set staff needed when the roster uses them).
+
+### Changed
+
+- Shift codes: the "In use" column and toggle is now called **Active**. A code that a roster uses shows a grayed-out **Delete** with the reason in a tooltip, instead of no Delete at all.
+
+### Fixed
+
+- The totals' short headings (Days, Off, Hrs, OT, Hol., Night, Wknd and the code counts) spell themselves out when you point at them: "Wknd" says "Weekend days worked: Saturdays, Sundays and holidays with a work shift".
+- On a narrow screen the day columns are cut off at the right edge with nothing to say they scroll. A shadow at the right edge now shows more days to the right, and one next to the names shows days hidden to the left.
+- When the roster is taller than the window, the staff needed rows at the bottom looked like they covered the last staff row. A shadow above them now shows the rows continue underneath while there is more to scroll.
+- My shifts: on a Sunday, today's number was red on the green circle. It is white now.
+- The roster no longer jumps up and down while you work. The status bar above it used to grow to two lines and shrink back as the save status ("Not saved yet", "Saving…", "All changes saved") and short messages changed length, so a click right after typing could land on the next person's row. The status bar now keeps one height: the status, rule count, labour cost and clock-in notice stay on one line (cut with "…" when there is no room, full text on hover and for screen readers), and messages appear on a line below that is always kept free. On a phone the labour cost and the clock-in notice get lines of their own.
+
 ## [1.4.0] - 2026-11-07
 
 ### Added

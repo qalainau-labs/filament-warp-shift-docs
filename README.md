@@ -97,7 +97,12 @@ class WardRoster extends ShiftRoster
 - PHP 8.3+
 - Laravel 12 or 13
 - Filament 5.x (Livewire 4)
-- MySQL 8 / MariaDB 10.6+, PostgreSQL 14+ or SQLite
+- SQLite, MySQL 8.0+, MariaDB 10.11+ or PostgreSQL 14+
+
+### Tested on
+
+Before each release, the full test suite runs on PHP 8.3, 8.4 and 8.5 × Laravel 12 and 13 × SQLite, MySQL, MariaDB and PostgreSQL, with each database at its newest and its oldest supported version: 42 combinations in all. A version is released only when every combination passes.
+[See the results for each release](https://github.com/qalainau-labs/filament-warp-shift-docs/tree/main/test-runs).
 
 ## Installation
 
@@ -217,7 +222,9 @@ Shift codes are managed under **Shifts → Shift codes** (the resource is added 
 | Counts as | **Work** counts as a working day and its hours; **Day off** and **Leave** count as days off; **Rest** (for "after night") counts as neither. |
 | Starts / Ends / Break | Working time. An end earlier than the start means the next day (night shifts). Hours are end − start − break. Codes without times count as 0 hours. |
 | Order | The order in the code list, the legend and the staff needed rows. You can also drag the rows. |
-| In use | Turned off codes can no longer be typed, but stay in old rosters. |
+| Active | Turned off codes can no longer be typed, but stay in old rosters. |
+
+A code that a roster uses cannot be deleted: its **Delete** button is grayed out, and pointing at it says why. Turn off **Active** instead.
 
 The code and the key can differ. Rules, `codes([...])`, requirements, rotations and `RosterPlan` always take the **key**: a night shift typed as `N` whose key is `night` (for example a key that comes from your payroll system) is written like this:
 
@@ -278,6 +285,21 @@ Rules that look back (consecutive days, sequences, rest hours) continue from the
 ```
 
 Return dates as `Y-m-d` strings or date objects. Holidays are shaded like Sundays, can have their own [staff needed](#staff-needed), and count as weekend days for fairness and the "Wknd" total.
+
+### Holidays from Warp DatePicker
+
+> Warp DatePicker is not released yet (coming soon). Until you install it, nothing changes: the roster does not use it
+> unless you call `useWarpDatePicker()`.
+
+With [Warp DatePicker](https://warpui.com) installed, use its calendar so the roster, the date fields and the other Warp plugins share one list of holidays:
+
+```php
+->useWarpDatePicker()                          // the public holidays of the panel's calendar
+->useWarpDatePicker('osaka')                   // one place of FilamentWarpDatePickerPlugin::calendars()
+->useWarpDatePicker(companyDaysOff: true)      // company days off (the year-end break) count as holidays too
+```
+
+It replaces `holidays()`. Warp DatePicker is not a dependency of Warp Shift: without it, the roster stops with a message saying to install it.
 
 ### Japanese public holidays
 
@@ -594,7 +616,7 @@ Rules are checked in the browser as you type and on the server for auto-fill and
 
 ### Overtime (Japan's 36 agreement)
 
-`MaxOvertime` counts overtime as you type and marks the day a limit of the 36 agreement (36協定) is crossed. With the rule, the roster also gets an **OT** total per person (and a **Hol.** total for holiday work when you set `legalHoliday()`).
+`MaxOvertime` counts overtime as you type and marks the day a limit of the 36 agreement (36協定) is crossed. With the rule, the roster also gets an **OT** total per person (and a **Hol.** total for holiday work when you set `legalHoliday()`). Point at a total heading to see its full name and what it counts.
 
 ```php
 use Qalainau\FilamentWarpShift\Rules\MaxOvertime;
