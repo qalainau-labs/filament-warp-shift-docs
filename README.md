@@ -301,6 +301,8 @@ With [Warp DatePicker](https://warpui.com) installed, use its calendar so the ro
 
 It replaces `holidays()`. Warp DatePicker is not a dependency of Warp Shift: without it, the roster stops with a message saying to install it.
 
+With multi-tenancy, the company days off are those of the roster's tenant, the same one Warp Shift uses for the roster itself: the panel's team, `asTenant()`, `RosterEvaluation::tenant()` and the other `tenant()` methods, or `tenantKey()` in a panel without tenancy (a staff panel). So a roster read from a staff panel, a command or a queued job has the same days off as the manager's screen, even where the Warp DatePicker plugin is not added to the panel. Where Warp Shift has no tenant, Warp DatePicker decides as usual.
+
 ### Japanese public holidays
 
 Japanese holidays are built in, with substitute holidays (振替休日) and the days between two holidays (国民の休日):

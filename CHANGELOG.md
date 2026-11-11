@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-11
+
+### Fixed
+
+- `useWarpDatePicker(companyDaysOff: true)` now reads the company days off of the roster's tenant (`asTenant()`,
+  `RosterEvaluation::tenant()`, the other `tenant()` methods, or `tenantKey()`), not the current panel's tenant. A roster
+  read from a staff panel without tenancy, a command or a queued job missed the company days off (the year-end break),
+  so the holidays there differed from the manager's screen. Needs Warp DatePicker 1.0.0 or later.
+
 ## [1.5.0] - 2026-11-10
 
 ### Added
