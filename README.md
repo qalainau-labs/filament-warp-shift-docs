@@ -96,7 +96,7 @@ class WardRoster extends ShiftRoster
 
 - PHP 8.3+
 - Laravel 12 or 13
-- Filament 5.x (Livewire 4)
+- Filament 5.8.3 or later (Livewire 4)
 - SQLite, MySQL 8.0+, MariaDB 10.11+ or PostgreSQL 14+
 
 ### Tested on
