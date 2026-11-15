@@ -5,6 +5,17 @@ All notable changes to `qalainau/filament-warp-shift` will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-11-15
+
+### Added
+
+- The shift codes list also asks your app's policy (`viewAny`) when you have one for the model, together with `canManage()`.
+- **Restricting pages per role.** `canAccessUsing(fn (User $user, string $page): bool => …)` and `canWriteUsing(…)` on the plugin let your app decide who can open each roster, My shifts and Requests & swaps (menu, URL and Livewire calls), and who only looks at them. They work together with `canManage`. A roster page can also override `canWrite()` to be read-only. Without them nothing changes.
+
+### Fixed
+
+- My shifts no longer fails in apps that use `Model::preventLazyLoading()` or `Model::shouldBeStrict()` when someone has asked you to swap a shift or offered one (the roster of each swap is now loaded with the list).
+
 ## [1.5.2] - 2026-11-12
 
 ### Changed

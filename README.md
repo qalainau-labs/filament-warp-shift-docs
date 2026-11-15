@@ -1390,6 +1390,55 @@ FilamentWarpShiftPlugin::make()
 
 `canManage` decides who can open roster pages, the shift codes and Requests & swaps. Default: anyone who can use the panel. Staff only need [My shifts](#my-shifts), so **if staff sign in to the same panel, set `canManage`**; otherwise every member of staff can open and edit the rosters.
 
+### Restricting pages per role
+
+Your app may already decide, per role, which screens a person can use and which they may only look at. `canAccessUsing()` and `canWriteUsing()` let it decide the same for the Shift pages:
+
+```php
+use App\Filament\Pages\NurseRoster;
+use Qalainau\FilamentWarpShift\Pages\ShiftInbox;
+
+FilamentWarpShiftPlugin::make()
+    ->canManage(fn (User $user) => $user->hasRole('scheduler'))
+    ->canAccessUsing(fn (User $user, string $page): bool => $user->canOpen($page))
+    ->canWriteUsing(fn (User $user, string $page): bool => ! $user->isReadOnlyOn($page))
+```
+
+`$page` is the page class:
+
+- your roster pages (the classes that extend `ShiftRoster`, such as `App\Filament\Pages\NurseRoster`)
+- `Qalainau\FilamentWarpShift\Pages\MyShifts`
+- `Qalainau\FilamentWarpShift\Pages\ShiftInbox`
+
+When `canAccessUsing()` returns `false`, the page is not in the menu, its URL answers 403, and a page that is already open stops answering (every Livewire call is checked again). The *Open roster* links in Requests & swaps are not shown for a roster the person cannot open.
+
+When `canWriteUsing()` returns `false`, the page opens to look at, but nothing on it changes data:
+
+| Page | Stopped (buttons hidden or disabled, calls answer 403) | Still works |
+|---|---|---|
+| Roster | typing in cells, Auto-fill, Publish, Borrow, Open shifts, Requirements (and typing them in the table), Requests, Remind, Availability, Rotation, Budget, Import, Import actuals, Lock / Unlock | moving between periods and scopes, Export (Excel, CSV), Payroll, Print |
+| My shifts | sending, changing and removing requests, *I’m done with my requests*, availability, asking for a swap or cover, accepting, declining and cancelling swaps, claiming and withdrawing open shifts | the calendar, moving between months, the calendar feed (including *Get a new address* and *Show days off and leave too*) |
+| Requests & swaps | approving and declining swaps, approving claims, cancelling open shifts, accepting and declining requests | the lists, *Open roster* |
+
+On the roster the buttons stay in place but are disabled, as when the roster is locked (`canEdit()` returns `false`). On the other pages they are hidden.
+
+The rules only narrow what the plugin allows: `canManage` still decides who may use the roster and Requests & swaps, and `myShifts()` and `staffForUser()` who may use My shifts. A rule that returns `true` cannot open them to anyone else. When you give a rule, a guest gets `false` from both.
+
+A roster page can also be made read-only in its own class, without a rule on the plugin:
+
+```php
+class NurseRosterOverview extends ShiftRoster
+{
+    public static function canWrite(): bool
+    {
+        return false;
+    }
+}
+```
+
+
+**Your own policies count too.** When your app has a policy for a model of this plugin, the shift codes list (`ShiftCodeResource`) also asks it (`viewAny`), together with the plugin's own options — so a role that may not use the screen gets a 403 there too. Without a policy nothing changes (also with Filament's `strictAuthorization()`).
+
 ## Tenancy
 
 Warp Shift works with [Filament's multi-tenancy](https://filamentphp.com/docs/5.x/users/tenancy), so one app can run the rosters of many hospitals, shops or teams (a SaaS) and nobody sees another team's rosters or people.
