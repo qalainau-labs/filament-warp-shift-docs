@@ -5,6 +5,13 @@ All notable changes to `qalainau/filament-warp-shift` will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-11-20
+
+### Fixed
+
+- **Console error `warpShiftRoster is not defined`**: on pages where Livewire re-renders the component inside another Alpine component, the browser console could show `warpShiftRoster is not defined` before the component's script had arrived. Empty components are now registered up front, and the real ones replace them as soon as they load. No visible change.
+- **Copying cells**: a cell whose text contains a lone carriage return (`\r`, e.g. text that came from an old Mac file) is now quoted when copied, so pasting it into Excel or Google Sheets no longer splits it into extra rows.
+
 ## [1.6.0] - 2026-11-15
 
 ### Added
