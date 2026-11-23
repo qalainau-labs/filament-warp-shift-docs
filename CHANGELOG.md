@@ -5,6 +5,33 @@ All notable changes to `qalainau/filament-warp-shift` will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-11-23
+
+### Added
+
+- Optional `Roster::twoShiftsPerDay()` lets a day hold two work codes (`E+L`), with separate colours, time bands and calendar events, and both codes counted in rules and coverage.
+
+- Drag a selected cell or rectangle by its border to move shifts, swap single cells or confirm range overwrites. Preview the destination, cancel with Escape and undo the whole move at once; pinned cells and hidden rows are protected.
+- Daily **I can work these hours** requests, including split hours, with roster hints and daily availability overrides for auto-fill and rule evaluation. Run the new requests times migration before using them.
+
+- Copy the previous draft period by nth weekday or date, and save, apply or delete tenant-specific roster templates from More. Copies use the usual save and Undo path; `RosterPlan::copyFrom()` provides the same mapping in code. Run the new templates migration before using templates.
+- Find staff by name, description, group or skills, or highlight an exact shift code. Selection, clipboard operations and fill handles use visible rows while coverage still counts everyone.
+
+- Optional `FilamentWarpShiftPlugin::make()->acknowledgements()`: staff confirm published shifts in My shifts with **I've seen them**. Only people whose shifts changed need to confirm again after Publish changes. Managers can see **Seen by 12 of 15**, who has not confirmed, and confirmation times. Run the new migration before enabling it.
+
+### Changed
+
+- `warp_shift_assignments` now has nullable `second_code_id`. Run migration `update_warp_shift_assignments_second_code` before enabling two shifts per day.
+- New table `warp_shift_acknowledgements` (migration `update_warp_shift_add_acknowledgements_table`) for `acknowledgements()`.
+- New table `warp_shift_templates` (migration `update_warp_shift_templates_table`) for roster templates.
+- `warp_shift_requests` now has nullable `starts_at`, `ends_at`, `second_starts_at` and `second_ends_at` (migration `update_warp_shift_requests_times`) for **I can work these hours** requests.
+- These are new migrations only; existing migrations are unchanged. Run `php artisan migrate`.
+
+### Fixed
+
+- **The roster's print time follows the panel's time zone**: the "Printed at" time on the print view of the roster was shown in the app's UTC. It now uses the panel's time zone.
+- **"Today" follows the panel's timezone**: the roster's today column, the month it opens on, the Today button (and "this period"), My shifts, the inbox, leave and request deadlines, open shifts, swaps, reminders, and the late / no clock-in judgement of `RosterEvaluation` decided "today" and "now" with the app's timezone (UTC). With a panel in `America/New_York`, after midnight UTC the roster already showed tomorrow. They now use Filament's timezone (`FilamentTimezone`, e.g. `Filament::getTimezone` / `FilamentTimezone::set()`), like Scheduler. The calendar feed's `TZID` also follows it.
+
 ## [1.6.1] - 2026-11-20
 
 ### Fixed

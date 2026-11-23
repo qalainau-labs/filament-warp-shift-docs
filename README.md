@@ -43,8 +43,8 @@ class WardRoster extends ShiftRoster
 ## Contents
 
 - [Why](#why) · [Features](#features) · [Requirements](#requirements) · [Installation](#installation)
-- Setting up: [The roster page](#the-roster-page) · [Staff](#staff) · [Shift codes](#shift-codes) · [Rosters per ward or shop](#rosters-per-ward-or-shop) · [Periods](#periods) · [Holidays](#holidays)
-- Planning: [Typing in the roster](#typing-in-the-roster) · [Times in a cell](#times-in-a-cell) · [Two times in a day](#two-times-in-a-day) · [The day by hour](#the-day-by-hour) · [Notes](#notes) · [Places](#places) · [Staff needed](#staff-needed) ([from your app](#staff-needed-from-your-app)) · [Rules](#rules) ([keys that no code has](#keys-that-no-code-has), [who works together](#who-works-together)) · [Rotations](#rotations) · [Auto-fill](#auto-fill) · [Why this person?](#why-this-person) · [Fairness over the year](#fairness-over-the-year) · [Help from another ward](#help-from-another-roster) · [Labour cost and budget](#labour-cost-and-budget) · [Importing from Excel](#importing-from-excel) · [Publishing](#publishing) · [Closing a roster](#closing-a-roster)
+- Setting up: [The roster page](#the-roster-page) ([Finding staff](#finding-staff)) · [Staff](#staff) · [Shift codes](#shift-codes) · [Rosters per ward or shop](#rosters-per-ward-or-shop) · [Periods](#periods) ([Copying a period and templates](#copying-a-period-and-templates)) · [Holidays](#holidays)
+- Planning: [Typing in the roster](#typing-in-the-roster) · [Times in a cell](#times-in-a-cell) · [Two times in a day](#two-times-in-a-day) · [Two shifts in a day](#two-shifts-in-a-day) · [The day by hour](#the-day-by-hour) · [Notes](#notes) · [Places](#places) · [Staff needed](#staff-needed) ([from your app](#staff-needed-from-your-app)) · [Rules](#rules) ([keys that no code has](#keys-that-no-code-has), [who works together](#who-works-together)) · [Rotations](#rotations) · [Auto-fill](#auto-fill) · [Why this person?](#why-this-person) · [Fairness over the year](#fairness-over-the-year) · [Help from another ward](#help-from-another-roster) · [Labour cost and budget](#labour-cost-and-budget) · [Importing from Excel](#importing-from-excel) · [Publishing](#publishing) ([Seen by staff](#seen-by-staff)) · [Closing a roster](#closing-a-roster)
 - Staff: [My shifts](#my-shifts) · [Requests](#requests) · [Leave balance](#leave-balance) · [Availability](#availability) · [Reminders](#reminders) · [Swaps and cover](#swaps-and-cover) · [Open shifts](#open-shifts) · [Approving swaps and requests](#approving-swaps-and-requests) · [Calendar feed](#calendar-feed) · [Notifications](#notifications)
 - [Clock-ins (actuals)](#clock-ins-actuals) · [Excel, CSV and printing](#excel-csv-and-printing) · [Payroll summary](#payroll-summary) · [Using rosters from your code](#using-rosters-from-your-code) ([rules and projections](#rules-and-projections-from-your-code)) · [Saving and working together](#saving-and-working-together) · [Permissions](#permissions) · [Tenancy](#tenancy) · [Testing](#testing) ([browser tests](#browser-tests-javascript)) · [Keyboard](#keyboard) · [Limitations](#limitations) · [Troubleshooting](#troubleshooting)
 
@@ -61,6 +61,11 @@ class WardRoster extends ShiftRoster
 - **No per-person pricing.** A license covers a project, not a head count.
 
 ## Features
+
+- Opt-in [two shifts in a day](#two-shifts-in-a-day): type `E+L`, with separate codes, colours and calendar events
+
+- Copy the previous draft period by weekday or date, and save recurring rosters as tenant-specific templates
+- Find staff by their displayed details, or highlight a shift code without changing coverage totals
 
 - Monthly roster on a `<canvas>`: frozen names, days and totals; weekends and holidays shaded; groups (teams) as header rows; phone layout
 - Typing by code or label (works with IME, so `早` or `夜` work too), a code list with Enter or double-click, Delete, copy and paste (TSV, to and from Excel), fill handle with repeating patterns, undo and redo, pinned cells
@@ -86,6 +91,7 @@ class WardRoster extends ShiftRoster
 - Requests from staff (day off, a shift, not a shift) with a deadline, an "I'm done" button, and reminders before the deadline
 - Availability: the days and hours each person can work every week ("Tuesdays and Thursdays only", "weekdays until 15:00"), registered by staff in My shifts or passed from your own data; marked in the roster before you type, kept by auto-fill and help from another roster
 - Publishing with versions; only the people whose shifts changed are notified
+- Optional [staff acknowledgements](#seen-by-staff): staff confirm they have seen their shifts; managers see who has not
 - Swaps between two people and cover requests open to everyone free that day; a night moves together with its rest day
 - Open shifts: post what auto-fill could not fill; only staff who are free and break no rule see them and raise a hand; you pick one (or the first one gets it) and the roster and the published version are updated
 - My shifts for staff (month calendar, phone friendly), an iCalendar feed (days off and leave too, if you like), database and mail notifications
@@ -184,6 +190,12 @@ A roster page is a class that extends `ShiftRoster` and returns its settings fro
 
 The page title is "Roster". Set `protected static ?string $title` on your page to change it, and `$navigationIcon`, `$navigationGroup` and `$navigationSort` as on any page.
 
+### Finding staff
+
+Use **Find staff or a code** above the grid to find a person by name or by their configured description, group or skills. For example, search for a ward group to work on its rows. Search ignores case, character width and hiragana/katakana differences.
+
+An exact shift key or label highlights that shift instead of hiding staff. **Clear** removes either search. While rows are hidden, the count shows how many staff are visible; coverage and shortage totals still include everyone. Copy, paste, range selection and the fill handle act on visible rows only. Search stays in the browser and clears when the page is reopened.
+
 ## Staff
 
 The rows of the roster are your own models: `User`, `Employee`, `Nurse`… Add the `HasShifts` trait to the model:
@@ -278,6 +290,24 @@ Periods then start on the anchor and every 28 days before and after it. The page
 
 Rules that look back (consecutive days, sequences, rest hours) continue from the end of the previous period: the last 7 days of the previous roster are read along (`->lookback(7)` to change). Auto-fill also places the "after night" and the day off that follow a night at the end of the previous roster.
 
+### Copying a period and templates
+
+For a shop whose roster repeats each month, open **More → Copy from the previous period**. This copies the draft from the immediately preceding period in the same roster, scope and tenant. **Same weekday** (default) maps the first Monday to the first Monday, the second Monday to the second Monday, and so on. **Same date** maps day numbers; dates absent from the destination, such as the 31st or February 30th, are skipped. A missing previous period produces a notice and creates no source roster.
+
+**Only fill empty cells** preserves existing entries. **Replace everything** shows the number of filled cells and clears unmatched destination entries as well. Codes, custom times, places and notes travel together; leave codes are excluded unless **Include leave** is checked. People absent from the current roster are skipped. Pinned cells and days assigned to another scope remain protected, as with paste. Applying a copy forms one normal edit batch, saved through the usual revision and Undo handling. Closed rosters cannot be copied into.
+
+Use **More → Save as template** to give the current draft a name. **More → Apply a template** offers the same empty/replace choices and a **Delete template** button. Templates store each person's nth weekday slots and belong to their tenant, roster and scope. Run `php artisan migrate` before using templates; existing rosters still work if this migration has not run, and opening a template action explains the missing table.
+
+The code API uses the same mapping:
+
+```php
+RosterPlan::for(ShopRoster::class, '2026-11-01')
+    ->tenant($company)
+    ->copyFrom('2026-10-01', mode: 'weekday', replace: false);
+```
+
+`copyFrom()` also accepts another `RosterPlan`; pass `includeLeave: true` to include leave. The source must already exist in the same tenant, roster and scope. Invalid sources and closed destinations raise `InvalidArgumentException`.
+
 ## Holidays
 
 ```php
@@ -340,6 +370,12 @@ Click a cell and type a code. With one cell selected the cursor then moves to th
 
 When you type a code that starts a sequence rule (`AfterShift::make('N')->then(['A', 'O'])`), the following empty, unpinned days are filled with the sequence too, and the cursor jumps past them.
 
+### Moving shifts by dragging
+
+Grab the border of the selected cell or rectangle (the pointer becomes **move**) and drop it on another day or person. A dashed outline previews the destination. One cell swaps with an occupied cell; a rectangle asks **Moving here would overwrite N cells.** before overwriting occupied cells. Press **Enter** or **OK** to confirm, or **Escape** during the drag to cancel.
+
+The code, both times, break, place and note move together. Pinned cells cannot be picked up or dropped on, and closed or read-only rosters cannot be dragged. With the row search active, dragging uses only visible rows. The whole move is one Undo step and saves through the usual bulk edit path. On touch screens, tap and swipe keep their existing behavior.
+
 ## Times in a cell
 
 For shops, cafés and anywhere people work different hours every day, type the times instead of a code: `10-15`, `9:30-14`, `1000-1500`, `22-6`. Full-width digits and `〜` work too. The code list shows **Use these times**; Enter puts them in. The cell then shows `10-15` in the code's color.
@@ -365,7 +401,7 @@ For shops, cafés and anywhere people work different hours every day, type the t
 
 For split shifts (a café that needs people for lunch and dinner, a cleaner who comes in the morning and the evening), type both times with a comma: `10-14,17-21`. `、` and `/` work as the comma too. The code list shows **Use these two times**; the cell shows `10-14` above `17-21`.
 
-The shift is still **one shift code** for the day, with two times. That is on purpose: every rule, swap, request and auto-fill works with one shift per person per day, and two separate shifts on one day would change all of them for little gain. If two parts of the day are different jobs, give them different [places](#places) on different days, or use one code for the combination.
+These split times use one shift code for the day. To give each part its own code, enable [two shifts in a day](#two-shifts-in-a-day) below.
 
 How the two times count:
 
@@ -380,6 +416,36 @@ How the two times count:
 | [The API](#reading-published-shifts) | `startsAt` is the start of the first time and `endsAt` the end of the second; `parts()` gives both, `minutes()` leaves the gap out. |
 
 The second time starts after the first one ends and both fit in 24 hours from the first start; `10-14,13-18` and `10-14,14-18` are refused. The second time may end after midnight (`18-22,23-2`). In the day by hour, a split shift has two bars; drag either one, but not over the other. Excel and CSV show `10-14,17-21`, and [importing](#importing-from-excel) reads it back.
+
+### Two shifts in a day
+
+For an early and a late shift on the same day, opt in on the roster:
+
+```php
+return $roster->twoShiftsPerDay(); // bool or closure; off by default
+```
+
+Type `E+L` (a full-width `＋` also works). With this option, press Enter to confirm a single code so you can continue typing `+` for a pair. Both codes must be active work codes available to this roster. Each uses its own times; the second must start after the first ends and finish within 24 hours of the first start, just like split times. Cells show the two labels in their own colours, and the tooltip shows both names and times. Drag each bar in **The day by hour** to change its times. Copy, Excel/CSV export and Excel import use `E+L`.
+
+| What | Counts |
+| --- | --- |
+| Hours, overtime, MaxHours, payroll, labour cost and night hours | Add both parts, leaving out the gap. Default breaks add both codes' breaks; editing times uses the existing break rule. Code allowances count for both codes. |
+| Staff needed by code and daily header counts | One person for each code: both E and L. |
+| Staff needed by time and the day timeline | Each part in its own time band; a code-specific band counts only that code's part. |
+| Code-count rules (MaxCount, MinCount), fairness | Count each matching code. |
+| MaxConsecutiveDays, AfterShift | Either code matches. Consecutive days count the day once; AfterShift triggers for either code and accepts either code on each following day. |
+| RequiredSkill, Together, NotTogether | Either code matches; a person counts once per day/group. Who works together means sharing either code (and the place, when requested). |
+| TeamMaxHours filtered by code | Either code selects the day; add both parts of the selected day. |
+| MinDaysOff, leave, weekend days | Count days, not parts. Both parts must be work, so leave cannot be combined. |
+| MinRestHours | The previous day's last end to the first start; the second end to the next day's first start. |
+| Requests (this shift / avoid this shift) | Either code matches. Hours requests must contain both parts. |
+| Swaps, cover and open shifts | Move or replace the whole cell for that day, including both codes and times. Open-shift posting still creates a single code. |
+| Auto-fill and rotations | Create one code per day; keep manually entered pairs. |
+| My shifts and calendar feed | Two parts, with each code's name; the feed has two events. |
+| PublishedShifts / RosterEvaluation | Both parts contribute. PublishedShift::code() remains the first; secondCode() returns the second or null; parts() keeps indexes 0/1 for start/end and adds a `code` entry to each part. |
+| Publish changes | A change to the second code also counts as a change for that person. |
+
+Retype `E` to remove the second code and its times. Clearing the cell or entering a day off removes both parts; Undo restores them. A cell holds at most two shifts, one shared note and one shared place. Run `php artisan migrate` to add `second_code_id` before enabling this option. Without the option, `E+L` remains an unknown code.
 
 ## The day by hour
 
@@ -815,6 +881,23 @@ Staff see the **published** version, never the draft you are typing in. **Publis
 
 Cells that differ from the published version get a small colored dot, so you can see what you have changed since.
 
+### Seen by staff
+
+Let staff confirm they have checked their published shifts, so managers can see who still needs to look. Enable this on your panel's plugin:
+
+```php
+FilamentWarpShiftPlugin::make()
+    ->acknowledgements()
+```
+
+You can pass `false`, or a closure receiving the current tenant and returning a boolean. This is off by default: without it, the screens stay the same and the acknowledgements table is never read.
+
+In **My shifts**, each period with published shifts shows a banner and **I've seen them**. Tapping it records the staff member's confirmation and hides the banner. **Publish changes** asks only people whose shifts changed to confirm again; everyone else's confirmation still counts.
+
+On the published roster, managers can open **Seen by 12 of 15** to see **Not seen yet**, plus the people who confirmed and when they did so. The count includes people with shifts in the latest published version, including staff helping from another roster.
+
+Run `php artisan migrate` after upgrading to create `warp_shift_acknowledgements` before enabling this feature. The new bundled migration runs without publishing it; the original migration is unchanged.
+
 ## Closing a roster
 
 **More → Close this roster** makes it read-only for everyone: no typing, auto-fill, requests or swaps. Use it at the end of the month, before payroll. **Reopen this roster** undoes it.
@@ -848,13 +931,15 @@ The closure gets the staff record of the signed-in user and the current company:
 
 ## Requests
 
-Open **More → Collect requests**, turn it on and optionally set the last day. Staff can then ask, per day, for a **day off**, to **work a shift** (or any shift) or **not to work a shift**, with a note. They can change or remove a request until the last day (the whole day counts).
+Open **More → Collect requests**, turn it on and optionally set the last day. Staff can then ask, per day, for a **day off**, to **work a shift** (or any shift) or **not to work a shift**, or choose **I can work these hours** and enter `10-15` or split hours such as `10-14,17-21`, with a note. They can change or remove a request until the last day (the whole day counts).
 
-Requests appear in the roster as small circles with the note in the tooltip, and auto-fill keeps every day-off request. Managers can approve or decline them in **Requests & swaps**; a declined request disappears from the roster and the person is notified.
+Requests appear in the roster as small circles, or faint hours for **I can work these hours**, with the note in the tooltip. Auto-fill keeps every day-off request. A daily hours request replaces weekly availability for that day: auto-fill uses only shift codes whose times fit within its one or two windows, and availability warnings use those hours too. It does not shorten a code or fill the gap between split windows. Pending and approved hours requests both apply; declined ones do not. Managers can approve or decline them in **Requests & swaps**; a declined request disappears from the roster and the person is notified.
 
 In My shifts, staff with nothing to ask for tap **I'm done with my requests**, so you know they have looked. The Collect requests dialog shows how many people have sent requests or said they are done.
 
 Turn requests off entirely with `->requests(false)`.
+
+For integrations, `ShiftRequest::type` is `RequestType::Off`, `Work`, `Avoid` or `Hours` (stored as `off`, `work`, `avoid`, `hours`). `Hours` has nullable string columns `starts_at`, `ends_at`, `second_starts_at`, `second_ends_at` (`HH:MM`); `code_id` is null. `hours()` returns `{start, end, start2?, end2?}` and `description()` gives the translated summary. Requests are separate from [published shifts](#reading-published-shifts) until a manager schedules them. Run the new `update_warp_shift_requests_times` migration when upgrading.
 
 ## Leave balance
 
@@ -1008,7 +1093,7 @@ For terms that change on a date, return a list of periods with `from` and/or `un
 
 The closure runs once per person each time a roster is read; eager-load what it needs in `staffQuery()`. An unknown day or a time that is not a time throws an `InvalidArgumentException`, so a typo does not silently allow everything.
 
-**Not covered:** one-off days ("not on May 3rd") are [requests](#requests); the plugin does not make one from the other. Availability is per person, not per roster: with self-registration, the same row is used by every roster page of the person that calls `availability()`.
+**Not covered:** one-off days ("not on May 3rd" or "10-15 on May 3rd") use [requests](#requests). A daily hours request replaces the weekly window on that date. Availability is per person, not per roster: with self-registration, the same row is used by every roster page of the person that calls `availability()`.
 
 ## Reminders
 
@@ -1089,7 +1174,7 @@ FilamentWarpShiftPlugin::make()
 
 ## Calendar feed
 
-My shifts shows a private address that staff can subscribe to in Google Calendar, Apple Calendar or Outlook. It lists their published working shifts from two months back, with their [notes](#notes) as the description and the [place](#places) as the location (a [split shift](#two-times-in-a-day) is two events), with times in the app's timezone (`config('app.timezone')`); a night ends on the next day at the clock time, also on the day clocks change. The address is signed; anyone with it can read that person's shifts, so treat it like a password.
+My shifts shows a private address that staff can subscribe to in Google Calendar, Apple Calendar or Outlook. It lists their published working shifts from two months back, with their [notes](#notes) as the description and the [place](#places) as the location (a [split shift](#two-times-in-a-day) is two events), with times in the panel's timezone (Filament's `FilamentTimezone`, which is `config('app.timezone')` unless you change it); a night ends on the next day at the clock time, also on the day clocks change. The address is signed; anyone with it can read that person's shifts, so treat it like a password.
 
 If someone else may have the address (a shared calendar, an old phone), the person clicks **Get a new address** under it. The old address stops working at once and calendars subscribed to it stop updating, so they subscribe again with the new one. The address of a person you delete stops working too.
 
@@ -1256,7 +1341,7 @@ A `PublishedShift` has:
 | Property / method | Value |
 | --- | --- |
 | `$staffKey`, `$date` | The person's key and the day (`Y-m-d`). |
-| `$startsAt`, `$endsAt` | The times on that day ([typed into the cell](#times-in-a-cell), or the code's) as dates in the app's timezone. The end is on the next day for a night shift. `null` for codes without times. For a [split shift](#two-times-in-a-day), the start of the first time and the end of the second. |
+| `$startsAt`, `$endsAt` | The times on that day ([typed into the cell](#times-in-a-cell), or the code's) as dates in the panel's timezone. The end is on the next day for a night shift. `null` for codes without times. For a [split shift](#two-times-in-a-day), the start of the first time and the end of the second. |
 | `isSplit()`, `parts()`, `$secondStartsAt`, `secondEndsAt()` | Whether the day has [two times](#two-times-in-a-day); `parts()` is `[[start, end]]`, or two pairs for a split shift (`[]` without times). |
 | `$place`, `$placeName` | The [place](#places): your key (as a string) and its name from `places()` (`null` without a place, or a name when the place is gone). |
 | `key()`, `label()`, `name()`, `kind()`, `isWork()` | The code. `$code` is the `ShiftCode` model itself. |
@@ -1750,16 +1835,16 @@ expect(shift).toMatchObject({ code: 'E', start: '07:00', end: '15:45', level: nu
 | Ctrl/⌘ + Z, Ctrl/⌘ + Y | Undo, redo |
 | Ctrl/⌘ + K | Pin or unpin |
 | Ctrl/⌘ + A | Select the whole roster |
-| Escape | Close the list, collapse the selection |
+| Escape | Cancel a drag, close the list, collapse the selection |
 
 On phones, swipe to scroll and tap to select. The names column is narrower and the totals are hidden.
 
 ## Limitations
 
-- **One shift code per person per day.** Rules, swaps, requests, open shifts and auto-fill all work with one shift a day. A [split shift](#two-times-in-a-day) is one code with two times (`10-14,17-21`); two different codes on one day (an early and a late as separate shifts) are not possible, so make a code for the combination when you need it.
+- **Up to two shifts per person per day (`twoShiftsPerDay()`).** One cell per person and day; [two shifts](#two-shifts-in-a-day) must both be work codes. Without the option, one code per day. Three or more shifts are not supported.
 - **A cell holds a shift code, [times](#times-in-a-cell), a [place](#places) and a [note](#notes)**, not other structured data of your own. For data that belongs to a shift code (a contract, a pay type), use the code's [`meta`](#shift-codes).
 - **Auto-fill uses the shift codes' own times.** It fills [time-of-day staff needed](#staff-needed-by-time-of-day) and keeps [availability](#availability) hours by choosing a code whose times fit; it does not type shorter times of its own. Type or drag times for anything else.
-- **[Availability](#availability) is weekly** (per weekday and holidays), with changes from a date; one-off days are [requests](#requests).
+- **[Availability](#availability) is weekly** (per weekday and holidays), with changes from a date; one-off days use [requests](#requests), including **I can work these hours** to override the hours for a single day.
 - **[Who works together](#who-works-together) compares shift codes (and places), not times:** two people on different codes that overlap in time are not "on the same shift".
 - **A [rotation](#rotations) is a list of shift codes, one per day.** It carries no typed times or places (auto-fill puts its shifts at places that are short; **Apply a rotation** leaves the place empty), and it continues from at most `lookback()` days before the first day unless you give `'from'`.
 - **[Leave](#leave-balance) counts one day per leave cell;** half-day leave is not a cell of its own. Make a half-day code of another kind if you need one, and keep its days in your app's balance.
