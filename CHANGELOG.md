@@ -5,6 +5,18 @@ All notable changes to `qalainau/filament-warp-shift` will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.7.1] - 2026-11-24
+
+### Fixed
+
+- Shift code chips and day timeline bars now use dark enough text on light code colours (for example green `#22c55e` or yellow): the text keeps the code's hue with its lightness capped, reaching at least 4.5:1 in light mode. Dark mode is unchanged. Browsers without CSS relative colours keep the previous colour.
+- French and Italian no longer put a plural noun after a single count in **Seen by N of M** and the Find staff count (French read « Lu par 1 employés sur 18 », now « Vu par 1 sur 18 employés »). Spanish no longer reads « Se muestran 1 de 18 personas ». Japanese now reads 確認済み 1 / 18 人.
+- Sentences with a count now use the singular for one in every language: copy and template notices (**Copied 1 cell from October 2026**, was “1 cells”), the drag overwrite confirmation, the import and clock-in import summaries, the draft comparison (**1 rule break · 1 warning**), the auto-fill “…and 1 more day short” line, the leave left in My shifts, and the “why this person” explanations (**D once this period**, **The only “Nurse” on D this day**). The file import summary now reads **People: 12 · Days: 30**. French reads « 1 case copiée depuis octobre 2026 » and Traditional Chinese names open shifts 招募不足的班次.
+- On narrow screens, the rule break and warning count in the roster's status line is no longer pushed past the right edge in long languages (French « 5 avertissements », Spanish); the save status shortens with “…” first, and the labour cost line no longer widens the row.
+- The roster's **Find staff or a code** box is wider, so the hint is no longer cut off in German, French, Spanish, Italian, Portuguese and Japanese. The clear button reads **Clear search**; Japanese and Korean word the highlight as a current state (シフト A を強調表示中).
+
 ## [1.7.0] - 2026-11-23
 
 ### Added
