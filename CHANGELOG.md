@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-26
+
+### Added
+
+- `Roster::costWidth()` keeps room for the labour cost in the bar above the roster (`->costWidth('11rem')` or pixels). Without it the cost gives way first on a short line and could end as "Labour cost …" with the amount cut off (for example in Japanese at 1280px). With it, the save state gives way instead. Not set by default, so nothing changes until you use it.
+
+### Fixed
+
+- **Cells and notes of a roster keep a fixed order**: the cells of a roster are now read by date, then ID, so `RosterPlan::cells()` and the notes come back in the same order every time on PostgreSQL.
+- **"Apply a template" with no templates**: the window opened with an empty Template list and nothing to choose. It now stays closed and tells how to make one (More → Save as template). Templates of another team do not count.
+
 ## [1.7.2] - 2026-11-26
 
 ### Fixed

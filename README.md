@@ -863,6 +863,20 @@ With `hourlyWage()`, the roster shows the cost of each day in a row under the ro
 
 The budget is per period. `budget()` gives the default; **More → Budget** sets one for the period, and an empty value goes back to the default. Over the budget is a warning for the whole team (`->budget(…, strict: true)` makes it an error). Auto-fill never adds [`fillWith()`](#auto-fill) shifts past the budget; staff needed are still filled. Only the cells of this roster count (a borrowed nurse costs in the ward they help).
 
+### Room for the total above the roster
+
+The bar above the roster puts the save state, the problem count and the labour cost on one line, so the roster never moves when a message gets longer. When the line is short of room, the labour cost gives way first and ends with "…" (the full text shows when you point at it). In languages with longer words, or with a budget (`Labour cost ¥3,820,000 / budget ¥4,000,000`), the amount itself can be cut off on a laptop screen.
+
+`costWidth()` keeps room for it:
+
+```php
+->costWidth('11rem')   // or pixels: ->costWidth(176)
+```
+
+- The labour cost never gets narrower than this. The save state ("All changes saved") gives way instead and can shrink to its colored dot; its full text still shows when you point at it. Pick the width your longest total needs: about `11rem` for `人件費 ￥7,527,694`, more with a budget.
+- It takes pixels or a CSS length in `px`, `rem`, `em`, `ch` or `%`; anything else throws. Without it (the default) nothing changes.
+- On narrow screens the labour cost already has a line of its own, so the width is not used there.
+
 ## Importing from Excel
 
 **More → Import from Excel** reads an `.xlsx` or CSV file of a roster made elsewhere:
