@@ -873,7 +873,7 @@ The bar above the roster puts the save state, the problem count and the labour c
 ->costWidth('11rem')   // or pixels: ->costWidth(176)
 ```
 
-- The labour cost never gets narrower than this. The save state ("All changes saved") gives way instead and can shrink to its colored dot; its full text still shows when you point at it. Pick the width your longest total needs: about `11rem` for `人件費 ￥7,527,694`, more with a budget.
+- The labour cost never gets narrower than this. The save state ("All changes saved") gives way instead: it shrinks to its colored dot, and on a crowded line it can disappear altogether (its full text still shows when you point at where it was). At 1280px with the sidebar open there is room for about `11rem` (`人件費 ￥7,527,694`) with the dot still showing; the longer European totals (`Personalkosten 101.426,01 $`) need about `16rem`, and then the save state is hidden. Pick the smallest width your longest total needs, more with a budget.
 - It takes pixels or a CSS length in `px`, `rem`, `em`, `ch` or `%`; anything else throws. Without it (the default) nothing changes.
 - On narrow screens the labour cost already has a line of its own, so the width is not used there.
 
