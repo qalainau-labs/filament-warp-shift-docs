@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.2] - 2026-11-26
+
+### Fixed
+
+- Open shifts on My shifts, and open shifts, swaps and requests in the shift inbox, now break ties on the date by ID. Before, rows on the same day could come back in a different order on PostgreSQL each time the page was opened, and which rows made it under the list limit (100–300) could change.
+
 ## [1.7.1] - 2026-11-24
 
 ### Fixed
